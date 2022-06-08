@@ -20,3 +20,15 @@ export const signUpSchema = Joi.object({
     "any.only": "Password and confirm password does not match",
   }),
 });
+
+export const signInSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    "string.empty": "Email is required",
+    "string.base": "Email must be a string",
+    "string.email": "Email must be a valid email",
+  }),
+  password: Joi.string().required().messages({
+    "string.empty": "Password is required",
+    "string.base": "Password must be a string",
+  }),
+});
