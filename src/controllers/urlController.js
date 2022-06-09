@@ -104,3 +104,48 @@ export async function redirect(req, res) {
     res.sendStatus(500);
   }
 }
+
+export async function deleteUrl(req, res) {
+  try {
+    const { id } = req.params;
+    const { userId } = res.locals;
+
+    const querySearch = {
+      text: `
+        SELECT
+          *
+        FROM
+          urls
+        WHERE
+          id = $1;
+      `,
+      values: [id],
+    };
+
+    const { rows } = await connection.query(querySearch);
+
+    if (rows.length === 0) {
+      return res.sendStatus(404);
+    }
+
+    if (rows[0].userId !== userId) {
+      return res.sendStatus(401);
+    }
+
+    const queryDelete = {
+      text: `
+        DELETE FROM
+          urls
+        WHERE
+          id = $1 AND "userId" = $2;`,
+      values: [id, userId],
+    };
+
+    await connection.query(queryDelete);
+
+    res.sendStatus(204);
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+}
