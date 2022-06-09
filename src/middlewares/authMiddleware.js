@@ -1,4 +1,5 @@
 import { stripHtml } from "string-strip-html";
+import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
 import connection from "./../config/database.js";
@@ -108,6 +109,56 @@ export async function validateSignIn(req, res, next) {
     }
 
     res.locals.user = rows[0];
+    next();
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+}
+
+export async function validateToken(req, res, next) {
+  const { authorization } = req.headers;
+  const token = authorization?.split(" ")[1]?.trim();
+
+  if (!token) {
+    return res.status(401).send({
+      msg: "You must be logged in to do this.",
+    });
+  }
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+  if (!decoded) {
+    return res.status(401).send({
+      msg: "Invalid token provided.",
+    });
+  }
+
+  try {
+    const { userId, sessionId } = decoded;
+
+    const query = {
+      text: `
+        SELECT
+          *
+        FROM
+          sessions
+        WHERE
+          ("userId" = $1) AND (id = $2) AND ("updatedAt" IS NULL);
+      `,
+      values: [userId, sessionId],
+    };
+
+    const { rows } = await connection.query(query);
+
+    if (rows.length === 0) {
+      return res.status(401).send({
+        msg: "Invalid token provided.",
+      });
+    }
+
+    res.locals.userId = userId;
+
     next();
   } catch (e) {
     console.log(e);
