@@ -1,26 +1,16 @@
 import { nanoid } from "nanoid";
 
-import connection from "./../config/database.js";
+import UrlRepository from "./../repositories/urlRepository.js";
 
 export async function urlShorten(req, res) {
   try {
     const { url } = req.body;
     const { userId } = res.locals;
 
-    const idSize = 8;
+    const idSize = 10;
     const shortUrl = nanoid(idSize);
 
-    const query = {
-      text: `
-        INSERT INTO
-          urls(url, "shortUrl", "userId")
-        VALUES
-          ($1, $2, $3);
-      `,
-      values: [url, shortUrl, userId],
-    };
-
-    await connection.query(query);
+    await UrlRepository.createUrl({ url, shortUrl, userId });
 
     res.send({ shortUrl });
   } catch (e) {
@@ -33,29 +23,15 @@ export async function getUrl(req, res) {
   try {
     const { id } = req.params;
 
-    const query = {
-      text: `
-        SELECT
-          id,
-          "shortUrl",
-          url
-        FROM
-          urls
-        WHERE
-          id = $1;
-      `,
-      values: [id],
-    };
+    const url = await UrlRepository.getUrlById(id);
 
-    const { rows } = await connection.query(query);
-
-    if (rows.length === 0) {
+    if (!url) {
       return res.sendStatus(404);
     }
 
-    const { url, shortUrl } = rows[0];
+    delete url.userId;
 
-    res.send({ id, shortUrl, url });
+    res.send(url);
   } catch (e) {
     console.log(e);
     res.sendStatus(500);
@@ -66,39 +42,15 @@ export async function redirect(req, res) {
   try {
     const { shortUrl } = req.params;
 
-    const query = {
-      text: `
-        SELECT
-          *
-        FROM
-          urls
-        WHERE
-          "shortUrl" = $1;
-      `,
-      values: [shortUrl],
-    };
+    const url = await UrlRepository.getUrlByShortUrl(shortUrl);
 
-    const { rows } = await connection.query(query);
-
-    if (rows.length === 0) {
-      return res.sendStatus(404);
+    if (!url) {
+      return res.status(404).send({ msg: "Url not found." });
     }
 
-    const queryUpdate = {
-      text: `
-        UPDATE
-          urls
-        SET
-          "visitCount" = "visitCount" + 1
-        WHERE
-          "shortUrl" = $1;
-      `,
-      values: [shortUrl],
-    };
+    await UrlRepository.incrementVisit(shortUrl);
 
-    await connection.query(queryUpdate);
-
-    res.redirect(rows[0].url);
+    res.redirect(url.url);
   } catch (e) {
     console.log(e);
     res.sendStatus(500);
@@ -110,40 +62,23 @@ export async function deleteUrl(req, res) {
     const { id } = req.params;
     const { userId } = res.locals;
 
-    const querySearch = {
-      text: `
-        SELECT
-          *
-        FROM
-          urls
-        WHERE
-          id = $1;
-      `,
-      values: [id],
-    };
+    const url = await UrlRepository.getUrlById(id);
 
-    const { rows } = await connection.query(querySearch);
-
-    if (rows.length === 0) {
-      return res.sendStatus(404);
+    if (!url) {
+      return res.status(404).send({
+        msg: "Url not found",
+      });
     }
 
-    if (rows[0].userId !== userId) {
-      return res.sendStatus(401);
+    if (url.userId !== userId) {
+      return res.status(401).send({
+        msg: "You are not authorized to delete this url",
+      });
     }
 
-    const queryDelete = {
-      text: `
-        DELETE FROM
-          urls
-        WHERE
-          id = $1 AND "userId" = $2;`,
-      values: [id, userId],
-    };
+    await UrlRepository.deleteUrl(id);
 
-    await connection.query(queryDelete);
-
-    res.sendStatus(204);
+    res.status(204).send({ msg: "Url deleted" });
   } catch (e) {
     console.log(e);
     res.sendStatus(500);
