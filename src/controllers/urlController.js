@@ -61,3 +61,46 @@ export async function getUrl(req, res) {
     res.sendStatus(500);
   }
 }
+
+export async function redirect(req, res) {
+  try {
+    const { shortUrl } = req.params;
+
+    const query = {
+      text: `
+        SELECT
+          *
+        FROM
+          urls
+        WHERE
+          "shortUrl" = $1;
+      `,
+      values: [shortUrl],
+    };
+
+    const { rows } = await connection.query(query);
+
+    if (rows.length === 0) {
+      return res.sendStatus(404);
+    }
+
+    const queryUpdate = {
+      text: `
+        UPDATE
+          urls
+        SET
+          "visitCount" = "visitCount" + 1
+        WHERE
+          "shortUrl" = $1;
+      `,
+      values: [shortUrl],
+    };
+
+    await connection.query(queryUpdate);
+
+    res.redirect(rows[0].url);
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+}
