@@ -28,3 +28,36 @@ export async function urlShorten(req, res) {
     res.sendStatus(500);
   }
 }
+
+export async function getUrl(req, res) {
+  try {
+    const { id } = req.params;
+
+    const query = {
+      text: `
+        SELECT
+          id,
+          "shortUrl",
+          url
+        FROM
+          urls
+        WHERE
+          id = $1;
+      `,
+      values: [id],
+    };
+
+    const { rows } = await connection.query(query);
+
+    if (rows.length === 0) {
+      return res.sendStatus(404);
+    }
+
+    const { url, shortUrl } = rows[0];
+
+    res.send({ id, shortUrl, url });
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+}
