@@ -126,15 +126,15 @@ export async function validateToken(req, res, next) {
     });
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-  if (!decoded) {
-    return res.status(401).send({
-      msg: "Invalid token provided.",
-    });
-  }
-
   try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (!decoded) {
+      return res.status(401).send({
+        msg: "Invalid token provided.",
+      });
+    }
+
     const { userId, sessionId } = decoded;
 
     const query = {
@@ -161,7 +161,12 @@ export async function validateToken(req, res, next) {
 
     next();
   } catch (e) {
-    console.log(e);
+    if (e.name === "TokenExpiredError") {
+      return res.status(401).send({
+        msg: "Your session has expired.",
+      });
+    }
+
     res.sendStatus(500);
   }
 }
