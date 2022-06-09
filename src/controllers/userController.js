@@ -6,7 +6,7 @@ export async function getUser(req, res) {
 
     const query = {
       text: `
-        SELECT 
+        SELECT
           users.id,
           users.name,
           COALESCE(SUM(urls."visitCount"), 0)::INTEGER AS "visitCount",
@@ -35,6 +35,37 @@ export async function getUser(req, res) {
     }
 
     res.send(rows[0]);
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+}
+
+export async function ranking(req, res) {
+  try {
+    const query = {
+      text: `
+        SELECT 
+          users.id,
+          users.name,
+          COUNT(urls.id)::INTEGER AS "linksCount",
+          COALESCE(SUM(urls."visitCount"),0)::INTEGER AS "visitCount"
+        FROM 
+          users 
+        LEFT JOIN 
+          urls 
+        ON 
+          urls."userId" = users.id
+        GROUP BY 
+          users.id, users.name
+        ORDER BY 
+          "visitCount" DESC, "linksCount" DESC
+        LIMIT 10;`,
+    };
+
+    const { rows } = await connection.query(query);
+
+    res.send(rows);
   } catch (e) {
     console.log(e);
     res.sendStatus(500);
