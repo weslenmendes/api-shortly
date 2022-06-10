@@ -21,7 +21,7 @@ export async function urlShorten(req, res) {
 
     await UrlRepository.updateShortUrl({ id, shortUrl, userId });
 
-    res.send({ shortUrl });
+    res.status(201).send({ shortUrl });
   } catch (e) {
     console.log(e);
     res.sendStatus(500);
