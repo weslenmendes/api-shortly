@@ -91,6 +91,12 @@ export async function validateToken(req, res, next) {
       });
     }
 
+    if (e.name === "JsonWebTokenError") {
+      return res.status(401).send({
+        msg: "Invalid token provided.",
+      });
+    }
+
     res.sendStatus(500);
   }
 }
