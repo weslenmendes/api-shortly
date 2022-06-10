@@ -1,34 +1,11 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import { stripHtml } from "string-strip-html";
 
 import UserRepository from "./../repositories/userRepository.js";
 import SessionRepository from "../repositories/sessionRepository.js";
 
-import { signUpSchema, signInSchema } from "./../schemas/authSchema.js";
-
-function sanitizeSignUpBody(body) {
-  const sanitizedBody = {
-    name: stripHtml(String(body.name) || "<br/>").result,
-    email: stripHtml(String(body.email) || "<br/>").result,
-    password: stripHtml(String(body.password) || "<br/>").result,
-    confirmPassword: stripHtml(String(body.confirmPassword) || "<br/>").result,
-  };
-
-  return sanitizedBody;
-}
-
 export async function validateSignUp(req, res, next) {
-  const bodySanitized = sanitizeSignUpBody(req.body);
-
-  const { error } = signUpSchema.validate(bodySanitized, { abortEarly: false });
-
-  if (error) {
-    const errorMessages = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    return res.status(422).send({ msg: errorMessages });
-  }
+  const { bodySanitized } = res.locals;
 
   try {
     const { email } = bodySanitized;
@@ -49,29 +26,9 @@ export async function validateSignUp(req, res, next) {
   }
 }
 
-function sanitizeSignInBody(body) {
-  const sanitizedBody = {
-    email: stripHtml(String(body.email) || "<br/>").result,
-    password: stripHtml(String(body.password) || "<br/>").result,
-  };
-
-  return sanitizedBody;
-}
-
 export async function validateSignIn(req, res, next) {
-  const bodySanitized = sanitizeSignInBody(req.body);
-
-  const { error } = signInSchema.validate(bodySanitized, { abortEarly: false });
-
-  if (error) {
-    const errorMessages = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    return res.status(422).send({ msg: errorMessages });
-  }
-
   try {
-    const { email, password } = bodySanitized;
+    const { email, password } = res.locals.bodySanitized;
 
     const result = await UserRepository.getUserByEmail(email);
 
