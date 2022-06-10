@@ -10,7 +10,16 @@ export async function urlShorten(req, res) {
     const idSize = 10;
     const shortUrl = nanoid(idSize);
 
-    await UrlRepository.createUrl({ url, shortUrl, userId });
+    const result = await UrlRepository.getShortUrlByUrl({ url, userId });
+
+    if (result.rowCount === 0) {
+      await UrlRepository.createUrl({ url, shortUrl, userId });
+      return res.send({ shortUrl });
+    }
+
+    const { id } = result.rows[0];
+
+    await UrlRepository.updateShortUrl({ id, shortUrl, userId });
 
     res.send({ shortUrl });
   } catch (e) {
@@ -23,13 +32,13 @@ export async function getUrl(req, res) {
   try {
     const { id } = req.params;
 
-    const url = await UrlRepository.getUrlById(id);
+    const result = await UrlRepository.getUrlById(id);
 
-    if (!url) {
+    if (result.rowCount === 0) {
       return res.sendStatus(404);
     }
 
-    delete url.userId;
+    const { userId, ...url } = result.rows[0];
 
     res.send(url);
   } catch (e) {
@@ -42,15 +51,15 @@ export async function redirect(req, res) {
   try {
     const { shortUrl } = req.params;
 
-    const url = await UrlRepository.getUrlByShortUrl(shortUrl);
+    const result = await UrlRepository.getUrlByShortUrl(shortUrl);
 
-    if (!url) {
+    if (result.rowCount === 0) {
       return res.status(404).send({ msg: "Url not found." });
     }
 
     await UrlRepository.incrementVisit(shortUrl);
 
-    res.redirect(url.url);
+    res.redirect(result.rows[0].url);
   } catch (e) {
     console.log(e);
     res.sendStatus(500);
@@ -62,15 +71,15 @@ export async function deleteUrl(req, res) {
     const { id } = req.params;
     const { userId } = res.locals;
 
-    const url = await UrlRepository.getUrlById(id);
+    const result = await UrlRepository.getUrlById(id);
 
-    if (!url) {
+    if (result.rowCount === 0) {
       return res.status(404).send({
         msg: "Url not found",
       });
     }
 
-    if (url.userId !== userId) {
+    if (result.rows[0].userId !== userId) {
       return res.status(401).send({
         msg: "You are not authorized to delete this url",
       });

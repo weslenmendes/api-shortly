@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-import connection from "./../config/database.js";
+import UserRepository from "./../repositories/userRepository.js";
+import SessionRepository from "./../repositories/sessionRepository.js";
 
 export async function signUp(req, res) {
   try {
@@ -9,16 +10,7 @@ export async function signUp(req, res) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const query = {
-      text: `
-        INSERT INTO 
-          users(name, email, password) 
-        VALUES 
-          ($1, $2, $3);`,
-      values: [name, email, hashedPassword],
-    };
-
-    await connection.query(query);
+    await UserRepository.createUser({ name, email, password: hashedPassword });
 
     res.sendStatus(201);
   } catch (e) {
@@ -31,31 +23,9 @@ export async function signIn(req, res) {
   try {
     const { id, name } = res.locals.user;
 
-    const queryUpdateSession = {
-      text: `
-        UPDATE
-          sessions
-        SET
-          "updatedAt" = NOW()
-        WHERE
-          ("userId" = $1 AND "updatedAt" IS NULL);`,
-      values: [parseInt(id)],
-    };
+    await SessionRepository.updateSession(id);
 
-    await connection.query(queryUpdateSession);
-
-    const queryCreateSession = {
-      text: `
-        INSERT INTO 
-          sessions("userId") 
-        VALUES 
-          ($1)
-        RETURNING
-          id;`,
-      values: [id],
-    };
-
-    const { rows } = await connection.query(queryCreateSession);
+    const { rows } = await SessionRepository.createSession(id);
 
     const data = { userId: id, sessionId: rows[0].id };
     const secretKey = process.env.JWT_SECRET;

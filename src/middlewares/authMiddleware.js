@@ -1,8 +1,9 @@
-import { stripHtml } from "string-strip-html";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { stripHtml } from "string-strip-html";
 
-import connection from "./../config/database.js";
+import UserRepository from "./../repositories/userRepository.js";
+import SessionRepository from "../repositories/sessionRepository.js";
 
 import { signUpSchema, signInSchema } from "./../schemas/authSchema.js";
 
@@ -32,20 +33,9 @@ export async function validateSignUp(req, res, next) {
   try {
     const { email } = bodySanitized;
 
-    const query = {
-      text: `
-        SELECT 
-          * 
-        FROM 
-          users 
-        WHERE 
-          email = $1`,
-      values: [email],
-    };
+    const result = await UserRepository.getUserByEmail(email);
 
-    const { rows } = await connection.query(query);
-
-    if (rows.length > 0) {
+    if (result.rowCount > 0) {
       return res.status(422).send({
         msg: "This email already exists.",
       });
@@ -83,32 +73,23 @@ export async function validateSignIn(req, res, next) {
   try {
     const { email, password } = bodySanitized;
 
-    const query = {
-      text: `
-        SELECT 
-          * 
-        FROM 
-          users 
-        WHERE 
-          (email = $1)`,
-      values: [email],
-    };
+    const result = await UserRepository.getUserByEmail(email);
 
-    const { rows } = await connection.query(query);
-
-    if (rows.length === 0) {
+    if (result.rowCount === 0) {
       return res.status(401).send({
         msg: "This user does not exist.",
       });
     }
 
-    if (!(await bcrypt.compare(password, rows[0].password))) {
+    const user = result.rows[0];
+
+    if (!bcrypt.compareSync(password, user.password)) {
       return res.status(401).send({
         msg: "Wrong password.",
       });
     }
 
-    res.locals.user = rows[0];
+    res.locals.user = user;
     next();
   } catch (e) {
     console.log(e);
@@ -135,29 +116,15 @@ export async function validateToken(req, res, next) {
       });
     }
 
-    const { userId, sessionId } = decoded;
+    const result = await SessionRepository.getSession(decoded);
 
-    const query = {
-      text: `
-        SELECT
-          *
-        FROM
-          sessions
-        WHERE
-          ("userId" = $1) AND (id = $2) AND ("updatedAt" IS NULL);
-      `,
-      values: [userId, sessionId],
-    };
-
-    const { rows } = await connection.query(query);
-
-    if (rows.length === 0) {
+    if (result.rowCount === 0) {
       return res.status(401).send({
         msg: "Invalid token provided.",
       });
     }
 
-    res.locals.userId = userId;
+    res.locals.userId = result.rows[0].userId;
 
     next();
   } catch (e) {
